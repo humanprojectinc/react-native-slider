@@ -31,10 +31,6 @@ def getExtOrIntegerDefault(name) {
 }
 
 android {
-  def agpVersion = com.android.Version.ANDROID_GRADLE_PLUGIN_VERSION
-    if (agpVersion.tokenize('.')[0].toInteger() >= 7) {
-        namespace "com.reactnativecommunity.slider"
-    }
   def agpVersion = com.android.Version.ANDROID_GRADLE_PLUGIN_VERSION.tokenize('.')
   // Check AGP version for backward compatibility w/react-native versions still on gradle plugin 6
   def major = agpVersion[0].toInteger()

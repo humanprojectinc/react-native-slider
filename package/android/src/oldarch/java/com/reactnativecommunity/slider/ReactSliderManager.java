@@ -30,13 +30,8 @@ public class ReactSliderManager extends SimpleViewManager<ReactSlider> {
             public void onProgressChanged(SeekBar seekbar, int progress, boolean fromUser) {
               ReactSlider slider = (ReactSlider)seekbar;
 
-              if(progress < slider.getLowerLimit()) {
-                progress = slider.getLowerLimit();
-                seekbar.setProgress(progress);
-              } else if(progress > slider.getUpperLimit()) {
-                progress = slider.getUpperLimit();
-                seekbar.setProgress(progress);
-              }
+              progress = slider.getValidProgressValue(progress);
+              seekbar.setProgress(progress);
 
               ReactContext reactContext = (ReactContext) seekbar.getContext();
               if(fromUser) {
@@ -65,11 +60,6 @@ public class ReactSliderManager extends SimpleViewManager<ReactSlider> {
                       new ReactSlidingCompleteEvent(
                               seekbar.getId(),
                               ((ReactSlider)seekbar).toRealProgress(seekbar.getProgress())));
-              reactContext.getNativeModule(UIManagerModule.class).getEventDispatcher().dispatchEvent(
-                      new ReactSliderEvent(
-                              seekbar.getId(),
-                              ((ReactSlider)seekbar).toRealProgress(seekbar.getProgress()),
-                              !((ReactSlider)seekbar).isSliding()));
             }
           };
 
@@ -77,7 +67,7 @@ public class ReactSliderManager extends SimpleViewManager<ReactSlider> {
   public String getName() {
     return ReactSliderManagerImpl.REACT_CLASS;
   }
-  
+
   static class ReactSliderShadowNode extends LayoutShadowNode implements
       YogaMeasureFunction {
 
@@ -100,14 +90,11 @@ public class ReactSliderManager extends SimpleViewManager<ReactSlider> {
         YogaMeasureMode widthMode,
         float height,
         YogaMeasureMode heightMode) {
-      if (!mMeasured) {
         SeekBar reactSlider = new ReactSlider(getThemedContext(), null);
         final int spec = View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED);
         reactSlider.measure(spec, spec);
         mWidth = reactSlider.getMeasuredWidth();
         mHeight = reactSlider.getMeasuredHeight();
-        mMeasured = true;
-      }
 
       return YogaMeasureOutput.make(mWidth, mHeight);
     }
@@ -139,17 +126,17 @@ public class ReactSliderManager extends SimpleViewManager<ReactSlider> {
   }
 
   @ReactProp(name = "minimumValue", defaultFloat = 0f)
-  public void setMinimumValue(ReactSlider view, float value) {
+  public void setMinimumValue(ReactSlider view, double value) {
     ReactSliderManagerImpl.setMinimumValue(view, value);
   }
 
   @ReactProp(name = "maximumValue", defaultFloat = 1f)
-  public void setMaximumValue(ReactSlider view, float value) {
+  public void setMaximumValue(ReactSlider view, double value) {
     ReactSliderManagerImpl.setMaximumValue(view, value);
   }
 
   @ReactProp(name = "lowerLimit")
-  public void setLowerLimit(ReactSlider view, float value) {
+  public void setLowerLimit(ReactSlider view, double value) {
     ReactSliderManagerImpl.setLowerLimit(view, value);
   }
 
@@ -203,8 +190,15 @@ public class ReactSliderManager extends SimpleViewManager<ReactSlider> {
     view.setOnSeekBarChangeListener(ON_CHANGE_LISTENER);
   }
 
-  @Override
-  public Map getExportedCustomDirectEventTypeConstants() {
-    return ReactSliderManagerImpl.getExportedCustomDirectEventTypeConstants();
-  }
+    @Nullable
+    @Override
+    public Map<String, Object> getExportedCustomBubblingEventTypeConstants() {
+        return ReactSliderManagerImpl.getExportedCustomBubblingEventTypeConstants();
+    }
+
+    @Nullable
+    @Override
+    public Map<String, Object> getExportedCustomDirectEventTypeConstants() {
+        return ReactSliderManagerImpl.getExportedCustomDirectEventTypeConstants();
+    }
 }

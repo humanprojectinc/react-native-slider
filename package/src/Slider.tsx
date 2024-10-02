@@ -1,23 +1,24 @@
-import React from 'react';
+import React, {useEffect, useState} from 'react';
 import {
   Image,
   Platform,
-  StyleSheet,
   AccessibilityActionEvent,
   ViewProps,
   ViewStyle,
   ColorValue,
   NativeSyntheticEvent,
   StyleProp,
+  View,
 } from 'react-native';
 import RCTSliderNativeComponent from './index';
 //@ts-ignore
 import type {ImageSource} from 'react-native/Libraries/Image/ImageSource';
 
-import type {Ref} from 'react';
-
-const LIMIT_MIN_VALUE = Number.MIN_SAFE_INTEGER;
-const LIMIT_MAX_VALUE = Number.MAX_SAFE_INTEGER;
+import type {FC, Ref} from 'react';
+import {MarkerProps} from './components/TrackMark';
+import {StepsIndicator} from './components/StepsIndicator';
+import {styles} from './utils/styles';
+import {constants} from './utils/constants';
 
 type Event = NativeSyntheticEvent<
   Readonly<{
@@ -172,6 +173,16 @@ type Props = ViewProps &
     inverted?: boolean;
 
     /**
+     * Component to be rendered for each step indicator.
+     */
+    StepMarker?: FC<MarkerProps>;
+
+    /**
+     *
+     */
+    renderStepNumber?: boolean;
+
+    /**
      * A string of one or more words to be announced by the screen reader.
      * Otherwise, it will announce the value as a percentage.
      * Requires passing a value to `accessibilityIncrements` to work correctly.
@@ -192,8 +203,6 @@ const SliderComponent = (
   props: Props,
   forwardedRef?: Ref<typeof RCTSliderNativeComponent>,
 ) => {
-  const style = StyleSheet.compose(props.style, styles.slider);
-
   const {
     onValueChange,
     onSlidingStart,
@@ -201,12 +210,35 @@ const SliderComponent = (
     onAccessibilityAction,
     ...localProps
   } = props;
+  const [currentValue, setCurrentValue] = useState(
+    props.value ?? props.minimumValue,
+  );
+  const [width, setWidth] = useState(0);
 
-  const onValueChangeEvent = onValueChange
-    ? (event: Event) => {
-        onValueChange(event.nativeEvent.value);
-      }
-    : null;
+  const stepResolution = localProps.step
+    ? localProps.step
+    : constants.DEFAULT_STEP_RESOLUTION;
+
+  const defaultStep =
+    (localProps.maximumValue! - localProps.minimumValue!) / stepResolution;
+  const stepLength = localProps.step || defaultStep;
+
+  const options = Array.from(
+    {
+      length: (localProps.step ? defaultStep : stepResolution) + 1,
+    },
+    (_, index) => localProps.minimumValue! + index * stepLength,
+  );
+
+  const defaultStyle =
+    Platform.OS === 'ios' ? styles.defaultSlideriOS : styles.defaultSlider;
+  const sliderStyle = {zIndex: 1, width: width};
+  const style = [props.style, defaultStyle];
+
+  const onValueChangeEvent = (event: Event) => {
+    onValueChange && onValueChange(event.nativeEvent.value);
+    setCurrentValue(event.nativeEvent.value);
+  };
 
   const _disabled =
     typeof props.disabled === 'boolean'
@@ -240,38 +272,78 @@ const SliderComponent = (
   const lowerLimit =
     !!localProps.lowerLimit || localProps.lowerLimit === 0
       ? localProps.lowerLimit
-      : LIMIT_MIN_VALUE;
+      : Platform.select({
+          web: localProps.minimumValue,
+          default: constants.LIMIT_MIN_VALUE,
+        });
 
   const upperLimit =
     !!localProps.upperLimit || localProps.upperLimit === 0
       ? localProps.upperLimit
-      : LIMIT_MAX_VALUE;
+      : Platform.select({
+          web: localProps.maximumValue,
+          default: constants.LIMIT_MAX_VALUE,
+        });
+
+  useEffect(() => {
+    if (lowerLimit >= upperLimit) {
+      console.warn(
+        'Invalid configuration: lower limit is supposed to be smaller than upper limit',
+      );
+    }
+  }, [lowerLimit, upperLimit]);
 
   return (
-    <RCTSliderNativeComponent
-      {...localProps}
-      value={value}
-      lowerLimit={lowerLimit}
-      upperLimit={upperLimit}
-      accessibilityState={_accessibilityState}
-      thumbImage={
-        Platform.OS === 'web'
-          ? props.thumbImage
-          : props.thumbImage
-          ? Image.resolveAssetSource(props.thumbImage)
-          : undefined
-      }
-      ref={forwardedRef}
-      style={style}
-      onChange={onValueChangeEvent}
-      onRNCSliderSlidingStart={onSlidingStartEvent}
-      onRNCSliderSlidingComplete={onSlidingCompleteEvent}
-      onRNCSliderValueChange={onValueChangeEvent}
-      disabled={_disabled}
-      onStartShouldSetResponder={() => true}
-      onResponderTerminationRequest={() => false}
-      onRNCSliderAccessibilityAction={onAccessibilityActionEvent}
-    />
+    <View
+      onLayout={(event) => {
+        setWidth(event.nativeEvent.layout.width);
+      }}
+      style={[style, {justifyContent: 'center'}]}>
+      {props.StepMarker || !!props.renderStepNumber ? (
+        <StepsIndicator
+          options={options}
+          sliderWidth={width}
+          currentValue={currentValue}
+          renderStepNumber={localProps.renderStepNumber}
+          thumbImage={localProps.thumbImage}
+          StepMarker={localProps.StepMarker}
+          isLTR={localProps.inverted}
+        />
+      ) : null}
+      <RCTSliderNativeComponent
+        {...localProps}
+        value={value}
+        lowerLimit={lowerLimit}
+        upperLimit={upperLimit}
+        accessibilityState={_accessibilityState}
+        thumbImage={
+          Platform.OS === 'web'
+            ? props.thumbImage
+            : props.StepMarker
+            ? undefined
+            : Image.resolveAssetSource(props.thumbImage)
+        }
+        ref={forwardedRef}
+        style={[
+          sliderStyle,
+          defaultStyle,
+          {alignContent: 'center', alignItems: 'center'},
+        ]}
+        onChange={onValueChangeEvent}
+        onRNCSliderSlidingStart={onSlidingStartEvent}
+        onRNCSliderSlidingComplete={onSlidingCompleteEvent}
+        onRNCSliderValueChange={onValueChangeEvent}
+        disabled={_disabled}
+        onStartShouldSetResponder={() => true}
+        onResponderTerminationRequest={() => false}
+        onRNCSliderAccessibilityAction={onAccessibilityActionEvent}
+        thumbTintColor={
+          props.thumbImage && !!props.StepMarker
+            ? 'transparent'
+            : props.thumbTintColor
+        }
+      />
+    </View>
   );
 };
 
@@ -284,12 +356,14 @@ SliderWithRef.defaultProps = {
   step: 0,
   inverted: false,
   tapToSeek: false,
-  lowerLimit: LIMIT_MIN_VALUE,
-  upperLimit: LIMIT_MAX_VALUE,
+  lowerLimit: Platform.select({
+    web: undefined,
+    default: constants.LIMIT_MIN_VALUE,
+  }),
+  upperLimit: Platform.select({
+    web: undefined,
+    default: constants.LIMIT_MAX_VALUE,
+  }),
 };
-
-let styles = StyleSheet.create(
-  Platform.OS === 'ios' ? {slider: {height: 40}} : {slider: {}},
-);
 
 export default SliderWithRef;

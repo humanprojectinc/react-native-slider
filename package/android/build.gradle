@@ -69,6 +69,6 @@ repositories {
 
 dependencies {
   //noinspection GradleDynamicVersion
-  api 'com.facebook.react:react-native:+'
+  api 'com.facebook.react:react-android:+'
 }
 
